@@ -1,3 +1,230 @@
+### 链表
+
+#### LRU（Least recently used）缓存问题
+
+- 用双链表+哈希Map结合实现
+
+```java
+class Node{
+  public int key, val;
+  public Node next, pre;
+  public Node(int key, int val){
+    	this.key = key;
+    	this.val = val;
+  }
+}
+
+class DoubleList{
+  private Node head, tail;
+  private int size;
+  public DoubleList(){
+      head = new Node(0, 0);
+      tail = new Node(0, 0);
+      head.next = tail;
+      tail.pre = head;
+      size = 0;
+  }
+  public void addLast(Node x){
+    //先找到新插入节点的定位
+      x.pre = tail.pre;
+      x.next = tail;
+    //去除旧的节点
+      tail.pre.next = x;
+      tail.pre = x;
+      size++;
+  }
+  public void remove(Node x){
+      x.pre.next = x.next;
+      x.next.pre = x.pre;
+      size--;
+  }
+  public Node removeFirst(){
+      if(head.next == tail){
+        	return null;
+      }
+      Node first = head.next;
+      remove(first);
+      return first;
+  }
+  public int size(){
+      return size;
+  }
+}
+
+public LRUCache{
+  private HashMap<Integer, Node> map;
+  private DoubleList cache;
+  private int cap;
+  public LRUCache(int capacity){
+    	this.cap = capacity;
+      map = new HashMap<>();
+    	cache = new DoubleList();
+	}
+  //以下主要实现HashMap相关代码
+  private void makeRecently(int key){
+      Node x = map.get(key);
+      cache.remove(x);
+      cache.addLast(x);
+  }
+  private void addRecently(int key, int val){
+      Node x = new Node(key, val);
+      cache.addLast(x);
+      map.put(key, x);
+  }
+  private void deleteKey(int key){
+      Node x = map.get(key);
+      cache.remove(x);
+      map.remove(key);
+	}
+  private void removeLRU(){
+      Node node == cache.removeFirst();
+      map.remove(node.key);
+  }
+  public int get(int key){
+    if(!map.containsKey(key)){
+      return -1;
+    }
+    makeRecently(key);
+    return map.get(key).val;
+  }
+  
+  public void put(int key, int value){
+    	if(!map.containsKey(key)){
+          if(cache.size() == cap){
+            	removeLRU();
+          }
+           addRecently(key, value);
+        	return;
+      }else{
+        	deleteKey(key);
+        	addRecently(key, value);
+        	return;
+      }
+  }
+}
+```
+
+- 用java内置的LinkedHashMap类实现
+
+```java
+class LRUCache{
+  private int cap;
+  private LinkedHashMap<Integer, Integer> cache;
+  public LRUCache(int capacity){
+      this.cap = capacity;
+      cache = new LinkedHashMap<>();
+  }
+
+  public int get(int key){
+    if(!cache.containsKey(key)){
+      return -1;
+    }
+    makeRecently(key);
+    return cache.get(key);
+  }
+  
+  public void put(int key, int val){
+    	if(!cache.containsKey(key)){
+          if(cache.size() == cap){
+            //该方法返回链中的第一个key
+            	int oldestKey = cache.keySet().iterator().next();
+            	cache.remove(oldestKey);
+          }
+        //默认在链尾插入节点
+           cache.put(key, val);
+        		return;
+      }else{
+        //调用put方法会在原节点覆盖val值
+        	cache.put(key, val);
+        //覆盖后把节点移动到链尾
+    			makeRecently(key);
+        	return;
+      }
+  }
+  
+  private void makeRecently(int key) {
+     int val = cache.get(key);
+     cache.remove(key);
+     cache.put(key, val);
+ }
+}
+```
+
+
+
+#### LFU（Least frequently used）缓存问题
+
+```java
+class LFUCache{
+  HashMap<Integer, Integer> keyToVal;
+  HashMap<Integer, Integer> keyToFreq;
+  HashMap<Integer, LinkedHashSet<Integer>> freqToKeys;
+  int minFreq;
+  int cap;
+  public LFUCache(int capacity){
+      keyToVal = new HashMap<>();
+      keyToFreq = new HashMap<>();
+      freqToKeys = new HashMap<>();
+      this.cap = capacity;
+      this.minFreq = 0; 
+  }
+  public int get(int key){
+      if(!keyToVal.containsKey(key)){
+          return -1;
+      }
+      increaseFreq(key);
+      return keyToVal.get(key);
+	}
+  public void put(int key, int val){
+    	if(keyToVal.containsKey(key)){
+        	keyToVal.put(key, val);
+        	increaseFreq(key);
+        	return;
+      }
+    	if(keyToVal.size() == cap){
+        removeMinFreq();
+      }
+    	keyToVal.put(key, val);
+    	keyToFreq.put(key, 1);
+    	freqToKeys.putIfAbsent(1, new LinkedHashSet<>());
+    	freqToKeys.get(1).add(key);
+    //当有新的key插入时，肯定新插入的key访问次数是最小的，即为1
+    	minFreq = 1;
+  }
+  private void increaseFreq(key){
+    	int oldFreq = keyToFreq.get(key);
+    	int currentFreq = oldFreq + 1;
+    	keyToFreq.put(key, currentFreq);
+    //如果新的frep不存在，要新建一个key-value对
+    	freqToKeys.putIfAbsent(currentFreq, new LinkedHashSet<>());
+    	freqToKeys.get(currentFreq).add(key);
+    //旧的frep表中去除这个key
+    	freqToKeys.get(oldFreq).remove(key);
+    	if(freqToKeys.get(oldFreq).isEmpty()){
+        	freqToKeys.remove(oldFreq);
+        	if(oldFreq == minFreq){
+           //如果原先的oldFreq是min，但现在这个key列表空了，那么现在的min就变成了oldFreq+1
+            	minFreq = currentFreq;
+          }
+      }
+}
+  private void removeMinFreq(){
+      LinkedHashSet<Integer> list = freqToKeys.get(minFreq);
+    //list中的第一个元素就是最早插入的
+      int deleteKey = list.iterator().next();
+      list.remove(deleteKey);
+      if(list.isEmpty()){
+        	freqToKeys.remove(minFreq);
+        //只有在插入新key时会调用该方法，而插入新key时minFreq的值会变成1，所以这里不需要更新minFreq
+      }
+      keyToVal.remove(deleteKey);
+      keyToFreq.remove(deleteKey);
+  }
+}
+```
+
+
+
 ### 双指针问题
 
 > 快慢指针：去重
@@ -381,7 +608,7 @@ class Solution {
 >    * }
 >    */
 >   public class Codec {
->                                                   
+>                                                             
 >       // Encodes a tree to a single string.
 >       public String serialize(TreeNode root) {
 >           StringBuilder sb = new StringBuilder();
@@ -397,7 +624,7 @@ class Solution {
 >           traverse(root.left, sb);
 >           traverse(root.right, sb);
 >       }
->                                                       
+>                                                                 
 >       // Decodes your encoded data to tree.
 >     public TreeNode deserialize(String data) {
 >         	if(data.isEmpty()){
@@ -407,7 +634,7 @@ class Solution {
 >           rootIndex[0] = 0;
 >           return des(data, rootIndex);
 >     }
->                                                       
+>                                                                 
 >     public TreeNode des(String data, int[] rootIndex){
 >           int nextPos = data.indexOf(",", rootIndex[0]);
 >           if(nextPos == -1){
@@ -415,10 +642,10 @@ class Solution {
 >           }
 >           //tmp记录当前root所在的位置,substring左闭右开，所以tmp记录的只有root。记录为String类而不是int，是因为后续涉及到字符串到int的转换
 >           String tmp = data.substring(rootIndex[0], nextPos);
->                                                   
+>                                                             
 >           //更新下一次查询位置
 >           rootIndex[0] = nextPos + 1;
->                                                           
+>                                                                     
 >           if(tmp.charAt(0) == '#'){
 >               return null;
 >           }else{
@@ -430,7 +657,7 @@ class Solution {
 >           }
 >       }
 >    }
->                                                   
+>                                                             
 >     // Your Codec object will be instantiated and called as such:
 >     // Codec ser = new Codec();
 >     // Codec deser = new Codec();
@@ -2613,10 +2840,359 @@ class Solution {
 
 
 
-### 一些面试常见的问题
+### 线段树问题
 
-#### 接雨水问题
+[参考材料](https://leetcode.cn/circle/discuss/H4aMOn/)
+
+```java
+class SegmentTree{
+    int[] nums, tree;
+    int n;
+    public SegmentTree(int[] nums){
+      this.nums = nums;
+      this.n = nums.length;
+      this.tree = new int[4 * n];
+      build(0, n - 1, 1);
+  }
+  
+  public void build(int s, int t, int i){
+      if(s == t){
+        tree[i] = nums[s];
+        return;
+    	}
+      int mid = s + (t - s) / 2;
+      build(s, mid, i * 2);
+      build(mid + 1, t, i * 2 + 1);
+      pushUp(i);
+  }
+  public void pushUp(int i){
+      //求区间和如下：
+      tree[i] = tree[2 * i] + tree[2 * i + 1];
+      //求区间最值如下：
+      tree[i] = Math.max(tree[2 * i], tree[2 * i + 1]);
+  }
+  
+  //给nums[index]的值加val
+  public void add(int index, int val){
+    add(index, val, 0, n - 1, 1);
+	}
+  private void add(int index, int val, int s, int t, int i){
+      if(s == t){
+          tree[i] += val;
+          return;
+      int mid = s + (t - s) / 2;
+      if(index <= mid){
+        	add(index, val, s, mid, i * 2);
+      }else{
+        	add(index, val, mid + 1, t, i * 2 + 1);
+      }
+      pushUp(i);
+  }
+  
+   public void update(int index, int val){
+     	add(index, val - nums[index], 0, n - 1, 1);
+     	nums[index] = val;//实时维护nums[index]
+   }
+}
+```
+
+#### 区间和
+
+```java
+public int sum(int l, int r){
+  return sum(l, r, 0, n - 1, 1);
+}
+private sum(int l, int r, int s, int t, int i){
+  if(l <= s && r >= t) return tree[i];//当前区间包含在所求区间中
+  int mid = s + (t - s) / 2;
+  int sum = 0;
+  if(l <= mid) sum += sum(l, r, s, mid, i * 2);
+  if(r > mid) sum += sum(l, r, mid + 1, t, i * 2 + 1);
+  return sum;
+}
+```
+
+#### 区间最值
+
+```java
+public int max(int l, int r){
+  return max(l, r, 0, n - 1, 1);
+}
+private max(int l, int r, int s, int t, int i){
+  //注意这里的return条件，如果求最值，则是s == t，如果求区间值，则是l <= s && r >= t
+  if(s == t) return tree[i];
+  int mid = s + (t - s) / 2;
+ 	lmax = Integer.MIN_VALUE;
+  rmax = Integer.MIN_VALUE;
+  if(l <= mid) lmax = max(l, r, s, mid, i * 2);
+  if(r > mid) rmax = max(l, r, mid + 1, t, i * 2 + 1);
+  return Math.max(lmax, rmax);
+}
+```
+
+#### 区间整段增量式修改
+
+```java
+class SegmentTreeAdd{
+  //注意这里增加了一个lazy数组，用来向下更新
+    int[] nums, tree, lazy;
+    int n;
+    public SegmentTreeAdd(int[] nums){
+        this.nums = nums;
+        this.n = nums.length;
+        this.tree = new int[4 * n];
+        this.lazy = new int[4 * n];
+        build(0, n - 1, 1);
+    }
+  
+   	private void build(int s, int t, int i){
+        if(s == t) { 
+            tree[i] = nums[s];
+            return;
+        }
+        int c = s + (t - s) / 2;
+        build(s, c, i * 2);
+        build(c + 1, t, i * 2 + 1);
+        pushUp(i);  // 后序动作，自底向上更新结点区间和 tree[i]
+    }
+  
+  // pushup: 更新 tree[i]
+    private void pushUp(int i){
+        tree[i] = tree[i * 2] + tree[i * 2 + 1];
+    }
+  
+   
+    public void add(int l, int r, int x){ // 区间修改(驱动): 增量式 [l,r] 区间所有元素加上x
+        add(l, r, x, 0, n - 1, 1);
+    }
+   
+   
+    // 区间修改: 增量式 [l,r] 区间所有元素加上x
+    private void add(int l, int r, int x, int s, int t, int i){
+        if(l <= s && t <= r){ // 当前结点代表的区间在所求区间之内
+            tree[i] += (t - s + 1) * x; // 结点i的区间和加上t-s+1个x
+            if(s != t) lazy[i] += x; // 结点i不是叶子结点，懒标记值加上x
+            return;
+        }
+        int c = s + (t - s) / 2;
+        if(lazy[i] != 0) pushDown(s, c, t, i); // 是否推送标记
+        if(l <= c) add(l, r, x, s, c, i * 2);
+        if(r > c) add(l, r, x, c + 1, t, i * 2 + 1);
+        pushUp(i); // 后序动作，自底向上更新结点区间和 tree[i]
+    }
+    
+    // pushdown: 更新当前结点及其左右子结点的懒标记
+    private void pushDown(int s, int c, int t, int i){
+        tree[i * 2] += (c - s + 1) * lazy[i]; // 更新其左子结点的区间和
+        lazy[i * 2] += lazy[i]; // 传递懒标记(增量标记)
+        tree[i * 2 + 1] += (t - c) * lazy[i];
+        lazy[i * 2 + 1] += lazy[i];
+        lazy[i] = 0; // 重置当前结点懒惰标记值（增量标记置0）
+    }
+}
+```
+
+#### 区间整段覆盖式修改
+
+```java
+class SegmentTreeUpdate{
+    int[] nums, tree, lazy;
+    boolean[] updated;
+    int n;
+    public SegmentTreeUpdate(int[] nums){
+        this.nums = nums;
+        this.n = nums.length;
+        this.tree = new int[4 * n];
+        this.lazy = new int[4 * n];
+      //注意这里新增了一个updated布尔数组
+        this.updated = new boolean[4 * n];
+        build(0, n - 1, 1);
+    }
+   
+    public void update(int l, int r, int x){ // 区间修改(驱动): 覆盖式 [l,r] 区间所有元素改为x
+        update(l, r, x, 0, n - 1, 1);
+    }
+  
+    // 区间修改: 覆盖式 [l,r] 区间所有元素改为x
+    private void update(int l, int r, int x, int s, int t, int i){
+        if(l <= s && t <= r){ // 当前结点代表的区间在所求区间之内
+            tree[i] = (t - s + 1) * x; // 结点i的区间和等于t-s+1个x
+            if(s != t) { // 结点i不是叶子结点
+                lazy[i] = x; // 更新懒标记
+                updated[i] = true; // 更新updated
+            }
+            return;
+        }
+        int c = s + (t - s) / 2;
+        if(updated[i]) pushDown(s, c, t, i); // 是否推送标记
+        if(l <= c) update(l, r, x, s, c, i * 2);
+        if(r > c) update(l, r, x, c + 1, t, i * 2 + 1);
+        pushUp(i); // 后序动作，自底向上更新结点区间和 tree[i]
+    }
+   
+  
+    // pushdown: 更新当前结点及其左右子结点的懒标记和updated
+    private void pushDown(int s, int c, int t, int i){
+        tree[i * 2] = (c - s + 1) * lazy[i]; // 更新其左子结点的区间和
+        lazy[i * 2] = lazy[i]; // 传递懒标记(覆盖式标记)
+        updated[i * 2] = true;
+        tree[i * 2 + 1] = (t - c) * lazy[i];
+        lazy[i * 2 + 1] = lazy[i];
+        updated[i * 2 + 1] = true;
+        lazy[i] = 0; // 重置当前结点懒惰标记值
+        updated[i] = false; // 重置当前结点updated[i]为false
+    }
+}
+
+//如果不是修改sum，而是修改最值，则不需要update[]，pushDown的条件改为lazy[i] != 0即可，同时pushDown中也不需要(c - s + 1) *lazy[i],而是lazy[i]
+```
+
+#### 小tips：离散化
+
+```java
+// 紧离散
+private Map<Integer, Integer> discrete(int[] nums){ 
+    Map<Integer, Integer> map = new HashMap<>();
+    Set<Integer> set = new HashSet<>();
+    for(int num : nums) set.add(num);
+    List<Integer> list = new ArrayList<>(set);
+    Collections.sort(list);
+    int idx = 0;
+    for(int num : list) map.put(num, ++idx);
+    return map;
+}
+
+//松离散
+private void discrete(int[] nums){ 
+    int n = nums.length;
+    int[] tmp = new int[n];
+    System.arraycopy(nums, 0, tmp, 0, n);
+    Arrays.sort(tmp);
+    for (int i = 0; i < n; ++i) {
+        nums[i] = Arrays.binarySearch(tmp, nums[i]) + 1;
+    }
+}
+```
 
 
 
-#### 丑数和质数相关问题
+### 前缀树问题
+
+```java
+class TrieNode {
+    private TrieNode[] links;
+    private final int R = 26;
+    private boolean isEnd;
+    public TrieNode() {
+        links = new TrieNode[R];
+    }
+    public boolean containsKey(char ch){
+        return links[ch - 'a'] != null;
+    }
+    public TrieNode get(char ch){
+        return links[ch - 'a'];
+    }
+    public void put(char ch, TrieNode node){
+        links[ch - 'a'] = node;
+    }
+    public void setEnd(){
+        isEnd = true;
+    }
+    public boolean isEnd(){
+        return isEnd;
+    }
+}
+ 
+class Trie {
+    private TrieNode root;
+
+    public Trie() {
+        root = new TrieNode();
+    }
+    
+    public void insert(String word) {
+        TrieNode current = root;
+        for (int i = 0; i < word.length(); i++) {
+            if(!current.containsKey(word.charAt(i))){
+                current.put(word.charAt(i), new TrieNode());
+            }
+            current = current.get(word.charAt(i));
+        }
+        current.setEnd();
+    }
+
+    public boolean search(String word) {
+        TrieNode current = root;
+        for(int i = 0; i < word.length(); i++){
+            if(!current.containsKey(word.charAt(i))){
+                return false;
+            }else{
+                TrieNode node = current.get(word.charAt(i));
+                current = node;
+            }
+        }
+        return current.isEnd();
+    }
+    
+    public boolean startsWith(String prefix) {
+        TrieNode current = root;
+        for(int i = 0; i < prefix.length(); i++){
+            if(!current.containsKey(prefix.charAt(i))){
+                return false;
+            }else{
+                TrieNode node = current.get(prefix.charAt(i));
+                current = node;
+            }
+        }
+        return true;
+    }
+}
+
+```
+
+
+
+### 一些用数学原理解决的问题
+
+#### 字符串匹配问题
+
+```java
+class Solution {
+   public int repeatedStringMatch(String A, String B) {
+        //A作为滚轮
+        char[] a = A.toCharArray();
+        char[] b = B.toCharArray();
+     		int count = 1;
+        for(int i = 0;i < a.length;i++){
+            int len = loop(a,b,i);
+            if(len > 0){
+              //说明匹配成功
+              int remained = b.length - (a.length - i);
+              count += remained / a.length;
+              count += remained % a.length == 0? 0 : 1;
+            }else if(len + a.length <= 0){
+              //这里如果len+a.length > 0，说明前面还没有完整地遍历过一次a，后边的字母可能会匹配成功，所以外部循环继续
+                return -1;
+            }
+        }
+        return -1;
+        
+    }
+    //使用a滚轮印刷b，start为起始点
+    public int loop(char[] a,char[] b,int start){
+        int count = start;
+        for(char c : b){
+            if(a[start % a.length] != c){
+                return count - start;
+            }
+            start++;
+        }
+        return 1; 
+    }
+}
+```
+
+
+
+
+

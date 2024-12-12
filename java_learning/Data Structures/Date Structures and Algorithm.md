@@ -251,7 +251,7 @@ DoublyListNode createDoublyLinkedList(int[] arr) {
 	
 *头部删除*
     
-    DoublyListNode head = createDoublyLinkedList(new int[]{1, 2, 3, 4, 5});
+  DoublyListNode head = createDoublyLinkedList(new int[]{1, 2, 3, 4, 5});
 	DoublyListNode newHead = head.next;
 	head.next = null;
 	head.prev = null;
